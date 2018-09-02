@@ -42,9 +42,13 @@ public class MultipleEntryBackupOperation extends AbstractMultipleEntryBackupOpe
     }
 
     @Override
-    public void run() throws Exception {
+    public void run() {
+        OwnerDownDetector ownerDownDetector = new OwnerDownDetector();
         EntryOperator operator = operator(this, backupProcessor, getPredicate());
         for (Data key : keys) {
+            if (ownerDownDetector.isOwnerDown(key)) {
+                break;
+            }
             operator.operateOnKey(key).doPostOperateOps();
         }
     }

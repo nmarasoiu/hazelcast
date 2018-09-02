@@ -39,14 +39,25 @@ public class PartitionWideEntryBackupOperation extends AbstractMultipleEntryBack
     }
 
     @Override
-    public void run() {
-        EntryOperator operator = operator(this, backupProcessor, getPredicate());
+    public final void run() {
+        try {
+            System.out.println("EBP run for p="+getPartitionId());
+            EntryOperator operator = operator(this, backupProcessor, getPredicate());
 
-        Iterator<Record> iterator = recordStore.iterator(Clock.currentTimeMillis(), true);
-        while (iterator.hasNext()) {
-            Record record = iterator.next();
-            operator.operateOnKey(record.getKey()).doPostOperateOps();
+            Iterator<Record> iterator = recordStore.iterator(Clock.currentTimeMillis(), true);
+            OwnerDownDetector ownerDownDetector = new OwnerDownDetector();
+            while (iterator.hasNext()) {
+                Record record = iterator.next();
+                if (ownerDownDetector.isOwnerDown(record.getKey())) {
+                    break;
+                }
+                operator.operateOnKey(record.getKey()).doPostOperateOps();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
+        System.out.println("EBP end for p=" + getPartitionId());
+        System.out.flush();
     }
 
     @Override

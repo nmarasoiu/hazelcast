@@ -22,6 +22,7 @@ import com.hazelcast.internal.metrics.MetricsRegistry;
 import com.hazelcast.internal.metrics.Probe;
 import com.hazelcast.internal.util.counters.SwCounter;
 import com.hazelcast.logging.ILogger;
+import com.hazelcast.map.impl.operation.PartitionWideEntryBackupOperation;
 import com.hazelcast.nio.Packet;
 import com.hazelcast.spi.Operation;
 import com.hazelcast.spi.impl.PartitionSpecificRunnable;
@@ -116,6 +117,9 @@ public abstract class OperationThread extends HazelcastManagedThread implements 
                 completedPacketCount.inc();
             } else if (task instanceof Operation) {
                 Operation operation = (Operation) task;
+                if(operation instanceof PartitionWideEntryBackupOperation){
+                    System.out.println("Received bac op="+operation);
+                }
                 currentRunner = getOperationRunner(operation.getPartitionId());
                 currentRunner.run(operation);
                 completedOperationCount.inc();

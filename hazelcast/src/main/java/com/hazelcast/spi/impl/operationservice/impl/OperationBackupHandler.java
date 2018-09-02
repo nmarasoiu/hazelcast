@@ -238,6 +238,7 @@ final class OperationBackupHandler {
 
     private int sendSingleBackup(BackupAwareOperation backupAwareOp, InternalPartition partition,
                                  long[] replicaVersions, int syncBackups, int replica) {
+//        System.out.println("send single backip "+backupAwareOp);
         Operation backupOp = getBackupOperation(backupAwareOp);
         Address target = partition.getReplicaAddress(replica);
         if (target != null) {

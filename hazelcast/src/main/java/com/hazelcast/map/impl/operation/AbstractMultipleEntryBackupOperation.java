@@ -16,22 +16,28 @@
 
 package com.hazelcast.map.impl.operation;
 
+import com.hazelcast.core.*;
 import com.hazelcast.internal.cluster.Versions;
+import com.hazelcast.map.AbortableEntryBackupProcessor;
 import com.hazelcast.map.EntryBackupProcessor;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
+import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.nio.serialization.impl.Versioned;
 import com.hazelcast.query.Predicate;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Provides common backup operation functionality for {@link com.hazelcast.map.EntryProcessor}
  * that can run on multiple entries.
  */
-abstract class AbstractMultipleEntryBackupOperation extends MapOperation implements Versioned {
-
+abstract class AbstractMultipleEntryBackupOperation extends MapOperation implements Versioned, HazelcastInstanceAware {
+    private static volatile AtomicBoolean addedMigrationListener = new AtomicBoolean();
     EntryBackupProcessor backupProcessor;
+    protected PartitionService partitionService;
+    protected HazelcastInstance hazelcastInstance;
 
     public AbstractMultipleEntryBackupOperation() {
     }
@@ -41,9 +47,56 @@ abstract class AbstractMultipleEntryBackupOperation extends MapOperation impleme
         this.backupProcessor = backupProcessor;
     }
 
+    @Override
+    public void setHazelcastInstance(HazelcastInstance hazelcastInstance) {
+        partitionService = hazelcastInstance.getPartitionService();
+        this.hazelcastInstance = hazelcastInstance;
+
+        if (addedMigrationListener.compareAndSet(false, true)) {
+            System.out.println("Adding listener to migrations");
+            //still to be put in config per node lifecycle before starting with config, so we have single listener in cluster if we used it
+            hazelcastInstance.getPartitionService().addMigrationListener(new MigrationListener() {
+                @Override
+                public void migrationStarted(MigrationEvent migrationEvent) {
+                    System.out.println("migrationStarted(" + migrationEvent);
+                }
+
+                @Override
+                public void migrationCompleted(MigrationEvent migrationEvent) {
+                    System.out.println("migrationComplete(" + migrationEvent);
+                }
+
+                @Override
+                public void migrationFailed(MigrationEvent migrationEvent) {
+                    System.out.println("migrationFailed(" + migrationEvent);
+                }
+            });
+        }
+    }
+
     protected Predicate getPredicate() {
         return null;
     }
+
+    class OwnerDownDetector {
+        int i = 0;
+        Partition partition = null;
+
+        boolean isOwnerDown(Object key) {
+            boolean ownerDownForPartition = false;
+            if (backupProcessor instanceof AbortableEntryBackupProcessor && (i++) % 100 == 0) {
+                if (partition == null) {
+                    partition = partitionService.getPartition(key);
+                }
+                if (partition.getOwner() == null) {
+                    System.out.println("Breaking from loop");
+                    ownerDownForPartition = true;
+                }
+            }
+            return ownerDownForPartition;
+        }
+    }
+
 
     @Override
     protected void writeInternal(ObjectDataOutput out) throws IOException {

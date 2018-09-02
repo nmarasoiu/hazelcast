@@ -76,7 +76,10 @@ public class PartitionWideEntryOperation extends MapOperation
         responses = new MapEntries(recordStore.size());
         operator = operator(this, entryProcessor, getPredicate());
 
+        //add serialized EP to a Set of them on a single key in this partition
+//        Set< ongoingEntryProcessors = recordStore.get("ongoingEntryProcessors");
         Iterator<Record> iterator = recordStore.iterator(Clock.currentTimeMillis(), false);
+//        System.out.println("EP run");
         while (iterator.hasNext()) {
             Record record = iterator.next();
             Data dataKey = record.getKey();
@@ -86,6 +89,8 @@ public class PartitionWideEntryOperation extends MapOperation
                 responses.add(dataKey, response);
             }
         }
+//        System.out.println("EP end");
+        //remove the EP from the Set
     }
 
     @Override
